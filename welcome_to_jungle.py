@@ -5,7 +5,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
-import csv
+import mysql.connector
 
 options = Options()
 options.add_argument("--disable-extensions")
@@ -22,17 +22,40 @@ body = driver.find_element(By.TAG_NAME, 'body')
 
 soup = BeautifulSoup(body.get_attribute('innerHTML'), 'html.parser')
 
-list_jobs_container = soup.find_all('li', attrs={'data-testid': 'search-results-list-item-wrapper'})
 
-with open('jobs.csv', 'w', newline='', encoding='utf-8') as file:
-    writer = csv.writer(file)
-    writer.writerow(['Job Title', 'Company', 'Location'])
+def get_jobs(soup):
+    list_jobs_container = soup.find_all('li', attrs={'data-testid': 'search-results-list-item-wrapper'})
+
+    db_connection = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="",
+        database="welcome_to_jungle"
+    )
+
+    cursor = db_connection.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS jobs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            job_title VARCHAR(255),
+            company VARCHAR(255),
+            location VARCHAR(255)
+        )
+    """)
 
     for job in list_jobs_container:
         job_title = job.find('h4').text
         job_company = job.find('span', {'class': 'sc-ERObt'}).text
         job_location = job.find('p', {'class': 'wui-text'}).text
 
-        writer.writerow([job_title, job_company, job_location])
+        sql = "INSERT INTO jobs (job_title, company, location) VALUES (%s, %s, %s)"
+        val = (job_title, job_company, job_location)
+        cursor.execute(sql, val)
 
+    db_connection.commit()
+    db_connection.close()
+
+
+get_jobs(soup)
 driver.quit()
